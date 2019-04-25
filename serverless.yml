@@ -1,0 +1,189 @@
+service: api-failover-example
+provider:
+  name: aws
+  runtime: nodejs8.10
+  environment:
+    NODE_ENV: ${opt:stage}
+
+functions:
+  sendEmail:
+    handler: dist/send.handler
+    environment:
+      MAILGUN_APIKEY: ${file(./config.json):${opt:stage}.mailgun.apiKey}
+      MAILGUN_DOMAIN: ${file(./config.json):${opt:stage}.mailgun.domain}
+      MAILGUN_SENDER: ${file(./config.json):${opt:stage}.mailgun.sender}
+      SENDGRID_APIKEY: ${file(./config.json):${opt:stage}.sendgrid.apiKey}
+      SENDGRID_SENDER: ${file(./config.json):${opt:stage}.sendgrid.sender}
+    events:
+      - http:
+          path: api/email/send
+          method: post
+          cors: true
+
+resources:
+  Resources:
+    # CloudfrontLoggingBucket:
+    #   Type: AWS::S3::Bucket
+    # LoggingBucketPolicy:
+    #   Type: "AWS::S3::BucketPolicy"
+    #   Properties:
+    #     Bucket:
+    #       Ref: CloudfrontLoggingBucket
+    #     PolicyDocument:
+    #       Version: "2012-10-17"
+    #       Statement:
+    #         - Sid: LoggingBucketObjectPermissions
+    #           Effect: Allow
+    #           Principal:
+    #             AWS:
+    #               Fn::Join:
+    #                 - ""
+    #                 - - "arn:aws:iam::"
+    #                   - Ref: AWS::AccountId
+    #                   - ":root"
+
+    #           Action: "s3:PutObject"
+    #           Resource:
+    #             Fn::Join:
+    #               - ""
+    #               - - Fn::GetAtt:
+    #                     - CloudfrontLoggingBucket
+    #                     - Arn
+    #                 - "/*"
+    #         - Sid: LoggingBucketPermissions
+    #           Effect: Allow
+    #           Principal:
+    #             AWS:
+    #               Fn::Join:
+    #                 - ""
+    #                 - - "arn:aws:iam::"
+    #                   - Ref: AWS::AccountId
+    #                   - ":root"
+    #           Action:
+    #             - s3:GetBucketAcl
+    #             - s3:PutBucketAcl
+    #           Resource:
+    #             Fn::Join:
+    #               - ""
+    #               - - Fn::GetAtt:
+    #                     - CloudfrontLoggingBucket
+    #                     - Arn
+
+    # FrontendStorage:
+    #   Type: AWS::S3::Bucket
+    # OriginBucketPolicy:
+    #   Type: AWS::S3::BucketPolicy
+    #   Properties:
+    #     Bucket:
+    #       Ref: FrontendStorage
+    #     PolicyDocument:
+    #       Statement:
+    #         - Sid: CloudFrontReadForGetBucketObjects
+    #           Effect: Allow
+    #           Principal:
+    #             CanonicalUser:
+    #               Fn::GetAtt:
+    #                 - CloudFrontS3OriginIdentity
+    #                 - S3CanonicalUserId
+    #           Action:
+    #             - s3:GetObject
+    #           Resource:
+    #             Fn::Join:
+    #               - ""
+    #               - - "arn:aws:s3:::"
+    #                 - Ref: FrontendStorage
+    #                 - "/*"
+    #         - Sid: CloudFrontReadForGetBucketObjects
+    #           Effect: Allow
+    #           Principal:
+    #             CanonicalUser:
+    #               Fn::GetAtt:
+    #                 - CloudFrontS3OriginIdentity
+    #                 - S3CanonicalUserId
+    #           Action: s3:ListBucket
+    #           Resource:
+    #             Fn::Join:
+    #               - ""
+    #               - - "arn:aws:s3:::"
+    #                 - Ref: FrontendStorage
+    # CloudFrontS3OriginIdentity:
+    #   Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
+    #   Properties:
+    #     CloudFrontOriginAccessIdentityConfig:
+    #       Comment: "s3 origin identity"
+    DefaultGatewayResponse4XXError:
+      Type: "AWS::ApiGateway::GatewayResponse"
+      Properties:
+        RestApiId:
+          Ref: "ApiGatewayRestApi"
+        ResponseType: DEFAULT_4XX
+        ResponseTemplates:
+          application/json: '{ "error":{ "errors": [{"code":"$context.error.responseType","message":$context.error.messageString}], "message": ""}}'
+    DefaultGatewayResponse5XXError:
+      Type: "AWS::ApiGateway::GatewayResponse"
+      Properties:
+        RestApiId:
+          Ref: "ApiGatewayRestApi"
+        ResponseType: DEFAULT_5XX
+        ResponseTemplates:
+          application/json: '{ "error":{ "errors": [{"code":"$context.error.responseType","message":$context.error.messageString}], "message": ""}}'
+    # CloudFrontDistribution:
+    #   Type: AWS::CloudFront::Distribution
+    #   Properties:
+    #     DistributionConfig:
+    #       Comment: Distribution for Frontend and API
+    #       DefaultCacheBehavior:
+    #         TargetOriginId: APIGatewayOrigin
+    #         ViewerProtocolPolicy: "redirect-to-https"
+    #         DefaultTTL: 30
+    #         AllowedMethods:
+    #           - GET
+    #           - HEAD
+    #           - OPTIONS
+    #           - DELETE
+    #           - PATCH
+    #           - POST
+    #           - PUT
+    #         ForwardedValues:
+    #           QueryString: true
+    #       Logging:
+    #         Bucket:
+    #           Fn::GetAtt:
+    #             - CloudfrontLoggingBucket
+    #             - DomainName
+    #       CacheBehaviors:
+    #         - TargetOriginId: StaticFilesOrigin
+    #           AllowedMethods:
+    #             - GET
+    #             - HEAD
+    #           ViewerProtocolPolicy: "redirect-to-https"
+    #           DefaultTTL: 30
+    #           PathPattern: static/*
+    #           ForwardedValues:
+    #             QueryString: true
+    #       Enabled: true
+    #       Origins:
+    #         - Id: APIGatewayOrigin
+    #           DomainName:
+    #             Fn::Join:
+    #               - "."
+    #               - - Ref: ApiGatewayRestApi
+    #                 - execute-api
+    #                 - Ref: AWS::Region
+    #                 - amazonaws.com
+    #           OriginPath: /${opt:stage}
+    #           CustomOriginConfig:
+    #             HTTPPort: 80
+    #             HTTPSPort: 443
+    #             OriginProtocolPolicy: https-only
+    #         - Id: StaticFilesOrigin
+    #           DomainName:
+    #             Fn::GetAtt:
+    #               - FrontendStorage
+    #               - DomainName
+    #           S3OriginConfig:
+    #             OriginAccessIdentity:
+    #               Fn::Join:
+    #                 - ""
+    #                 - - origin-access-identity/cloudfront/
+    #                   - Ref: CloudFrontS3OriginIdentity
