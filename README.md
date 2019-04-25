@@ -16,6 +16,7 @@ Different to desired architecture due to time constraint
 ![Send Email Logic](/images/send-email-logic.jpg)
 
 ## TODO
+* UI to send email
 * Cloudfront for frontend
 * SQS for failover and retry
 * Better validation on email address (allow email to accept alias)
