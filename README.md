@@ -73,3 +73,18 @@ npm run build
 ```
 serverless deploy --stage <stage> --region <region>
 ```
+
+### How to use
+POST API endpoint with the following json payload
+```
+{
+	"to": "<email>",
+	"subject": "test",
+	"message": "test message"
+}
+```
+
+
+## Caveats
+* It looks like sendgrid requires domain verification for the sender, except test@email.com
+* Make sure to check your spam inbox while testing
