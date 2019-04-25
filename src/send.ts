@@ -3,9 +3,11 @@ import { APIResponse, APIError } from "./response";
 import { SendGrid } from "./mail-services/send-grid";
 
 export function requestValidate(
-  to: string,
+  to: string[],
   subject: string,
-  message: string
+  message: string,
+  cc?: string[],
+  bcc?: string[]
 ): (Error | APIError)[] {
   let errs = [];
   if (!subject) {
@@ -22,24 +24,69 @@ export function requestValidate(
     });
   }
 
-  if (!to) {
+  if (!Array.isArray(to)) {
     errs.push({
       code: "BAD_REQUEST_PARAMETER",
-      message: "to is empty"
+      message: "to is not array"
     });
-  } else if (!/^[\w|\.]+@[a-zA-Z_\.]+$/.test(to)) {
+  } else if (!to.length) {
     errs.push({
       code: "BAD_REQUEST_PARAMETER",
-      message: "to is not an email address"
+      message: "to needs to contain at least one email address"
     });
+  } else {
+    for (let i = 0; i < to.length; ++i) {
+      if (!to[i]) {
+        errs.push({
+          code: "BAD_REQUEST_PARAMETER",
+          message: `"to" contains empty or undefined entry`
+        });
+      } else if (!/^[\w|\.]+@[a-zA-Z_\.]+$/.test(to[i])) {
+        errs.push({
+          code: "BAD_REQUEST_PARAMETER",
+          message: `${to[i]} is not an email address`
+        });
+      }
+    }
   }
+
+  if (cc) {
+    if (!Array.isArray(cc)) {
+      errs.push({
+        code: "BAD_REQUEST_PARAMETER",
+        message: "cc is not array"
+      });
+    } else if (!cc.length) {
+      errs.push({
+        code: "BAD_REQUEST_PARAMETER",
+        message: "cc is an empty array"
+      });
+    }
+  }
+
+  if (bcc) {
+    if (!Array.isArray(bcc) || !bcc.length) {
+      errs.push({
+        code: "BAD_REQUEST_PARAMETER",
+        message: "bcc is not array"
+      });
+    } else if (!bcc.length) {
+      errs.push({
+        code: "BAD_REQUEST_PARAMETER",
+        message: "bcc is an empty array"
+      });
+    }
+  }
+
   return errs;
 }
 
 interface SendLaunchBody {
-  to: string;
+  to: string[];
   subject: string;
   message: string;
+  cc: string[] | undefined;
+  bcc: string[] | undefined;
 }
 
 export async function handler(event: any) {
@@ -52,7 +99,13 @@ export async function handler(event: any) {
     return apiResponse.serialize();
   }
 
-  let errs = requestValidate(body.to, body.subject, body.message);
+  let errs = requestValidate(
+    body.to,
+    body.subject,
+    body.message,
+    body.cc,
+    body.bcc
+  );
   if (errs.length) {
     apiResponse.addError(errs);
     return apiResponse.serialize();
@@ -62,7 +115,7 @@ export async function handler(event: any) {
   let sendGrid = new SendGrid();
 
   try {
-    await mailGun.send(body.to, body.subject, body.message);
+    await mailGun.send(body.to, body.subject, body.message, body.cc, body.bcc);
     apiResponse.data = {
       status: "ok"
     };
@@ -72,7 +125,7 @@ export async function handler(event: any) {
   }
 
   try {
-    await sendGrid.send(body.to, body.subject, body.message);
+    await sendGrid.send(body.to, body.subject, body.message, body.cc, body.bcc);
     apiResponse.data = {
       status: "ok"
     };
@@ -85,5 +138,6 @@ export async function handler(event: any) {
     code: "ERROR",
     message: "failed to send email"
   });
+
   return apiResponse.serialize();
 }

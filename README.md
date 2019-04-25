@@ -19,7 +19,7 @@ Different to desired architecture due to time constraint
 * Cloudfront for frontend
 * SQS for failover and retry
 * Better validation on email address (allow email to accept alias)
-* Unit test on email sending logic
+* Better handling on timeout error
 
 ## Deployment
 ### Install
@@ -78,7 +78,9 @@ serverless deploy --stage <stage> --region <region>
 POST API endpoint with the following json payload
 ```
 {
-	"to": "<email>",
+	"to": ["<email>"],
+  "cc": ["<email>"],  // optional
+  "bcc": ["<email>"], // optional
 	"subject": "test",
 	"message": "test message"
 }
@@ -88,3 +90,4 @@ POST API endpoint with the following json payload
 ## Caveats
 * It looks like sendgrid requires domain verification for the sender, except test@email.com
 * Make sure to check your spam inbox while testing
+* Need to make sure all receipients are authorized in mailgun if you are using sandbox mode

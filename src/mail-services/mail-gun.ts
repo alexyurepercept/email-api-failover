@@ -1,4 +1,14 @@
 import { send, RequestConfig } from "../request";
+
+interface MailGunForm {
+  to: string;
+  from: string;
+  subject: string;
+  text: string;
+  cc?: string;
+  bcc?: string;
+}
+
 const toQueryString = (data: Object): string => {
   let keys = Object.keys(data);
   let stringPairs = [];
@@ -12,13 +22,27 @@ const toQueryString = (data: Object): string => {
 };
 
 export class MailGun {
-  send(to: string, subject: string, text: string) {
-    let mailGunForm = {
-      from: process.env.MAILGUN_SENDER,
-      to,
+  send(
+    to: string[],
+    subject: string,
+    text: string,
+    cc?: string[],
+    bcc?: string[]
+  ) {
+    let mailGunForm: MailGunForm = {
+      from: process.env.MAILGUN_SENDER as string,
+      to: to.join(","),
       subject,
       text
     };
+
+    if (cc) {
+      mailGunForm.cc = cc.join(",");
+    }
+
+    if (bcc) {
+      mailGunForm.bcc = bcc.join(",");
+    }
     let requestConfig: RequestConfig = {
       host: "api.mailgun.net",
       port: 443,
@@ -32,7 +56,6 @@ export class MailGun {
       },
       body: toQueryString(mailGunForm)
     };
-    console.log(requestConfig);
 
     return send(requestConfig);
   }
